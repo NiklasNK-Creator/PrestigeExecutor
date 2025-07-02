@@ -1,0 +1,12 @@
+[
+  {
+    "name": "Fly Script",
+    "description": "Ermöglicht Fliegen im Spiel",
+    "url": "https://pastebin.com/raw/abc123"
+  },
+  {
+    "name": "Speed Hack",
+    "description": "Erhöht die Laufgeschwindigkeit",
+    "url": "https://raw.githubusercontent.com/NiklasNK-Creator/scripts/main/speed.lua"
+  }
+]
